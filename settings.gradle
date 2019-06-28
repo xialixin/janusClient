@@ -1,1 +1,1 @@
-include ':app', ':janusclientapi'
+include ':app', ':janusclientapi', ':libwebrtc'
