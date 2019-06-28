@@ -15,6 +15,8 @@ import org.webrtc.VideoRenderer;
 import org.webrtc.VideoRendererGui;
 
 public class JanusActivity extends Activity {
+    private static final String ACTIVITY_TYPE = "videoRoom";
+
     private static final boolean AUTO_HIDE = true;
 
     private GLSurfaceView vsv;
@@ -22,6 +24,8 @@ public class JanusActivity extends Activity {
     private VideoRenderer.Callbacks remoteRender;
     private EchoTest echoTest;
     private VideoRoomTest videoRoomTest;
+
+    private VideoRenderer.Callbacks remoteRenders[] = new VideoRenderer.Callbacks[3];
 
     /**
      * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
@@ -48,15 +52,31 @@ public class JanusActivity extends Activity {
     private class MyInit implements Runnable {
 
         public void run() {
-            init();
-        }
+            if(ACTIVITY_TYPE == "echo") {
+                initEcho();
+            } else {
+                initVideoRoom();
+            }
+            }
 
-        private void init() {
+        private void initEcho() {
             try {
                 EGLContext con = VideoRendererGui.getEGLContext();
                 echoTest = new EchoTest(localRender, remoteRender);
-                echoTest.initializeMediaContext(JanusActivity.this, true, true, true, con);
+                echoTest.initializeMediaContext(JanusActivity.this, false, true, false, con);
                 echoTest.Start();
+
+            } catch (Exception ex) {
+                Log.e("computician.janusclient", ex.getMessage());
+            }
+        }
+
+        private void initVideoRoom() {
+            try {
+                EGLContext con = VideoRendererGui.getEGLContext();
+                videoRoomTest = new VideoRoomTest(localRender, remoteRenders);
+                videoRoomTest.initializeMediaContext(JanusActivity.this, true, true, true, con);
+                videoRoomTest.Start();
 
             } catch (Exception ex) {
                 Log.e("computician.janusclient", ex.getMessage());
@@ -80,6 +100,13 @@ public class JanusActivity extends Activity {
         VideoRendererGui.setView(vsv, new MyInit());
 
         localRender = VideoRendererGui.create(72, 72, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, false);
-        remoteRender = VideoRendererGui.create(0, 0, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, true);
+
+        if (ACTIVITY_TYPE == "echo") {
+            remoteRender = VideoRendererGui.create(0, 0, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, true);
+        } else if(ACTIVITY_TYPE == "videoRoom") {
+            remoteRenders[0] = VideoRendererGui.create(0, 0, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, true);
+            remoteRenders[1] = VideoRendererGui.create(72, 0, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, true);
+            remoteRenders[2] = VideoRendererGui.create(0, 72, 25, 25, VideoRendererGui.ScalingType.SCALE_ASPECT_FILL, true);
+        }
     }
 }
