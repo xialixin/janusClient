@@ -1,2 +1,2 @@
-# janus-gateway-android
-android rtc client for janus gateway
+# janusClient
+janus_gateway_android rebuild by the lasted android studio tools,base on "https://github.com/pcgpcgpcg/janus-gateway-android"
