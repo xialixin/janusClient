@@ -11,18 +11,46 @@ import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
+import org.webrtc.Logging;
 import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoCapturer;
-import org.webrtc.VideoRenderer;
+import org.webrtc.VideoFrame;
+import org.webrtc.VideoSink;
+//import org.webrtc.VideoRenderer;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
 import in.minewave.janusvideoroom.PeerConnectionClient.PeerConnectionParameters;
 import in.minewave.janusvideoroom.PeerConnectionClient.PeerConnectionEvents;
 
 public class MainActivity extends AppCompatActivity implements JanusRTCInterface, PeerConnectionEvents {
     private static final String TAG = "MainActivity";
+
+    private static class ProxyVideoSink implements VideoSink {
+        private VideoSink target;
+
+        @Override
+        synchronized public void onFrame(VideoFrame frame) {
+            if (target == null) {
+                Logging.d(TAG, "Dropping frame in proxy because target is null.");
+                return;
+            }
+
+            target.onFrame(frame);
+        }
+
+        synchronized public void setTarget(VideoSink target) {
+            this.target = target;
+        }
+    }
+
+    private final ProxyVideoSink remoteProxyRenderer = new ProxyVideoSink();
+    private final ProxyVideoSink localProxyVideoSink = new ProxyVideoSink();
+    private final List<VideoSink> remoteSinks = new ArrayList<>();
 
     private PeerConnectionClient peerConnectionClient;
     private PeerConnectionParameters peerConnectionParameters;
@@ -47,9 +75,14 @@ public class MainActivity extends AppCompatActivity implements JanusRTCInterface
         createLocalRender();
         remoteRender = (SurfaceViewRenderer) findViewById(R.id.remote_video_view);
         remoteRender.init(rootEglBase.getEglBaseContext(), null);
-        peerConnectionParameters  = new PeerConnectionParameters(false, 352, 288, 30, "VP8", true, 0, "opus", false, false, false, false, false);
+        localProxyVideoSink.setTarget(localRender);
+        remoteProxyRenderer.setTarget(remoteRender);
+        remoteSinks.add(remoteProxyRenderer);
+        peerConnectionParameters  = new PeerConnectionParameters(false, 352, 288, 30, "VP8", false,
+                0, "opus", false, false, false, false, false,
+                false, false);
         peerConnectionClient = PeerConnectionClient.getInstance();
-        peerConnectionClient.createPeerConnectionFactory(this, peerConnectionParameters, this);
+        peerConnectionClient.createPeerConnectionFactory(this, rootEglBase, peerConnectionParameters, this);
     }
 
     @Override
@@ -124,7 +157,7 @@ public class MainActivity extends AppCompatActivity implements JanusRTCInterface
 
     private void offerPeerConnection(BigInteger handleId) {
         videoCapturer = createVideoCapturer();
-        peerConnectionClient.createPeerConnection(rootEglBase.getEglBaseContext(), localRender, videoCapturer, handleId);
+        peerConnectionClient.createPeerConnection(localProxyVideoSink, remoteSinks, videoCapturer, handleId);
         peerConnectionClient.createOffer(handleId);
     }
 
@@ -213,11 +246,11 @@ public class MainActivity extends AppCompatActivity implements JanusRTCInterface
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-//                remoteRender = new SurfaceViewRenderer(MainActivity.this);
-//                remoteRender.init(rootEglBase.getEglBaseContext(), null);
-//                LinearLayout.LayoutParams params  = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-//                rootView.addView(remoteRender, params);
-                connection.videoTrack.addRenderer(new VideoRenderer(remoteRender));
+                //remoteRender = new SurfaceViewRenderer(MainActivity.this);
+                //remoteRender.init(rootEglBase.getEglBaseContext(), null);
+                LinearLayout.LayoutParams params  = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                rootView.addView(remoteRender, params);
+//                connection.videoTrack.addRenderer(new VideoRenderer(remoteRender));
             }
         });
     }
