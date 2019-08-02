@@ -15,9 +15,9 @@ buildscript {
 
 allprojects {
     repositories {
-        flatDir {
-            dirs "$rootProject.projectDir/app/libs"
-        }
+        //flatDir {
+        //    dirs "$rootProject.projectDir/app/libs"
+        //}
         jcenter()
         google()
     }
@@ -35,5 +35,5 @@ ext {
     androidSupportSdkVersion = '28.0.0'
 
     releaseVersionCode = 3
-    releaseVersionName = '3.0.0'
+    releaseVersionName = '3.0.1'
 }

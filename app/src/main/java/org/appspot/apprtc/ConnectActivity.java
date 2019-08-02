@@ -437,7 +437,7 @@ public class ConnectActivity extends Activity {
       Uri uri = Uri.parse(roomUrl);
       Intent intent;
       switch (type){
-        case LOOPBACK:
+        /*case LOOPBACK:
           intent= new Intent(this, EchoTestActivity.class);
           break;
         case AUDIOBRIDGE:
@@ -445,7 +445,7 @@ public class ConnectActivity extends Activity {
           break;
         case VIDEOLIVE:
           intent= new Intent(this, VideoLiveActivity.class);
-          break;
+          break;*/
         case VIDEOMEETING:
           intent= new Intent(this, VideoRoomActivity.class);
           break;
