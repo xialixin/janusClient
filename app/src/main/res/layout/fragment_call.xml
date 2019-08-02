@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/contact_name_call"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp"
+        android:textColor="#ffffff"
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
+
+    <LinearLayout
+           android:id="@+id/buttons_call_container"
+           android:orientation="horizontal"
+           android:layout_above="@+id/capture_format_text_call"
+           android:layout_alignWithParentIfMissing="true"
+           android:layout_marginBottom="8dp"
+           android:layout_centerHorizontal="true"
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content">
+
+       <ImageButton
+           android:id="@+id/button_call_disconnect"
+           android:background="@drawable/disconnect"
+           android:contentDescription="@string/disconnect_call"
+           android:layout_marginEnd="16dp"
+           android:layout_width="36dp"
+           android:layout_height="36dp"/>
+
+       <ImageButton
+           android:id="@+id/button_call_switch_camera"
+           android:background="@drawable/switch_camera"
+           android:contentDescription="@string/switch_camera"
+           android:layout_marginEnd="8dp"
+           android:layout_width="36dp"
+           android:layout_height="36dp"/>
+
+        <ImageButton
+           android:id="@+id/button_call_scaling_mode"
+           android:background="@drawable/ic_action_return_from_full_screen"
+           android:contentDescription="@string/disconnect_call"
+           android:layout_width="0dp"
+           android:layout_height="0dp"/>
+
+       <ImageButton
+           android:id="@+id/button_call_toggle_mic"
+           android:background="@drawable/mic_unmute"
+           android:contentDescription="@string/toggle_mic"
+           android:layout_marginEnd="8dp"
+           android:layout_width="36dp"
+           android:layout_height="36dp"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/capture_format_text_call"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_above="@+id/capture_format_slider_call"
+        android:textSize="16sp"
+        android:text="@string/capture_format_change_text"/>
+
+    <SeekBar
+        android:id="@+id/capture_format_slider_call"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_alignParentBottom="true"
+        android:progress="50"
+        android:layout_margin="8dp"/>
+
+</RelativeLayout>
