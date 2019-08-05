@@ -95,8 +95,7 @@ public class CallFragment extends Fragment {
       @Override
       public void onClick(View view) {
         boolean enabled = callEvents.onToggleMic();
-        //toggleMuteButton.setAlpha(enabled ? 1.0f : 0.3f);
-        toggleMuteButton.setBackgroundResource(enabled? R.drawable.mic_unmute:R.drawable.mic_mute);
+        toggleMuteButton.setAlpha(enabled ? 1.0f : 0.3f);
       }
     });
 
@@ -110,11 +109,11 @@ public class CallFragment extends Fragment {
     boolean captureSliderEnabled = false;
     Bundle args = getArguments();
     if (args != null) {
-      String contactName = args.getString(VideoRoomActivity.EXTRA_ROOMID);
+      String contactName = args.getString(CallActivity.EXTRA_ROOMID);
       contactView.setText(contactName);
-      videoCallEnabled = args.getBoolean(VideoRoomActivity.EXTRA_VIDEO_CALL, true);
+      videoCallEnabled = args.getBoolean(CallActivity.EXTRA_VIDEO_CALL, true);
       captureSliderEnabled = videoCallEnabled
-          && args.getBoolean(VideoRoomActivity.EXTRA_VIDEO_CAPTUREQUALITYSLIDER_ENABLED, false);
+          && args.getBoolean(CallActivity.EXTRA_VIDEO_CAPTUREQUALITYSLIDER_ENABLED, false);
     }
     if (!videoCallEnabled) {
       cameraSwitchButton.setVisibility(View.INVISIBLE);

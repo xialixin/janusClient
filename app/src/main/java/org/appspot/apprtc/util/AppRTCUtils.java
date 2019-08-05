@@ -13,8 +13,6 @@ package org.appspot.apprtc.util;
 import android.os.Build;
 import android.util.Log;
 
-import java.util.Random;
-
 /**
  * AppRTCUtils provides helper functions for managing thread safety.
  */
@@ -45,29 +43,5 @@ public final class AppRTCUtils {
             + "Manufacturer: " + Build.MANUFACTURER + ", "
             + "Model: " + Build.MODEL + ", "
             + "Product: " + Build.PRODUCT);
-  }
-
-
-  // Helper method to create random identifiers (e.g., transaction)
-  public static String randomString(int len){
-    String charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    String randomString = null;
-    for (int i = 0; i < len; i++) {
-      int randomPoz = (int)Math.floor(Math.random() * charSet.length());
-      randomString += charSet.substring(randomPoz,randomPoz+1);
-      Log.i("AppRTCUtils","randomPoz:"+randomPoz+" charSetLen:"+charSet.length());
-    }
-    return randomString;
-  }
-
-  //another random way to generate
-  private String randomString(Integer length) {
-    final String str = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    final Random rnd = new Random();
-    StringBuilder sb = new StringBuilder(length);
-    for (int i = 0; i < length; i++) {
-      sb.append(str.charAt(rnd.nextInt(str.length())));
-    }
-    return sb.toString();
   }
 }
