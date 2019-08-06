@@ -47,7 +47,7 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.annotation.Nullable;
+import android.support.annotation.Nullable;
 import org.appspot.apprtc.AppRTCAudioManager.AudioDevice;
 import org.appspot.apprtc.AppRTCAudioManager.AudioManagerEvents;
 import org.appspot.apprtc.PeerConnectionClient2.DataChannelParameters;
@@ -284,7 +284,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
 
         // Get Intent parameters.
         roomUrl=intent.getDataString();
-        roomId = intent.getLongExtra(EXTRA_ROOMID, 0);
+        //roomId = intent.getLongExtra(EXTRA_ROOMID, 0);
         roomId=1234;
         Log.d(TAG, "Room ID: " + roomId);
         if (roomId == 0) {
@@ -333,7 +333,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
                         intent.getBooleanExtra(EXTRA_DISABLE_BUILT_IN_NS, false),
                         intent.getBooleanExtra(EXTRA_DISABLE_WEBRTC_AGC_AND_HPF, false),
                         intent.getBooleanExtra(EXTRA_ENABLE_RTCEVENTLOG, false),
-                        intent.getBooleanExtra(EXTRA_USE_LEGACY_AUDIO_DEVICE, false), dataChannelParameters);
+                        dataChannelParameters);
         commandLineRun = intent.getBooleanExtra(EXTRA_CMDLINE, false);
         int runTimeMs = intent.getIntExtra(EXTRA_RUNTIME, 0);
 
@@ -779,7 +779,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     // All callbacks are invoked from peer connection client looper thread and
     // are routed to UI thread.
     @Override
-    public void onLocalDescription(final BigInteger handleId, final SessionDescription sdp) {
+    public void onLocalDescription(final SessionDescription sdp, final BigInteger handleId) {
         final long delta = System.currentTimeMillis() - callStartedTimeMs;
         runOnUiThread(new Runnable() {
             @Override
@@ -863,6 +863,18 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
         });
     }
 
+    public void onPeerConnectionClosed() {
+        Log.d(TAG, "onPeerConnectionClosed !");
+    }
+
+    public void onDisconnected() {
+        Log.d(TAG, "onDisconnected !");
+    }
+
+    public void onConnected() {
+        Log.d(TAG, "onConnected !");
+    }
+
     private void setClickListener(final int index) {
         if(index == 0) return;
 
@@ -881,7 +893,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     }
 
     @Override
-    public void onIceCandidate(final BigInteger handleId, final IceCandidate candidate) {
+    public void onIceCandidate(final IceCandidate candidate, final BigInteger handleId) {
         Log.d(TAG,"========onIceCandidate=======");
         runOnUiThread(new Runnable() {
             @Override
@@ -897,7 +909,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     }
 
     @Override
-    public void onIceCandidatesRemoved(final BigInteger handleId, final IceCandidate[] candidates) {
+    public void onIceCandidatesRemoved(final IceCandidate[] candidates, final BigInteger handleId) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -934,10 +946,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     }
 
     @Override
-    public void onPeerConnectionClosed(final BigInteger handleId) {}
-
-    @Override
-    public void onPeerConnectionStatsReady(final BigInteger handleId, final StatsReport[] reports) {
+    public void onPeerConnectionStatsReady(final StatsReport[] reports, final BigInteger handleId) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -949,7 +958,8 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     }
 
     @Override
-    public void onPeerConnectionError(final BigInteger handleId, final String description) {
+    public void onPeerConnectionError(final String description) {
+        Log.d(TAG, "onPeerConnectionError: description is" + description);
         reportError(description);
     }
 
@@ -1074,6 +1084,5 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
     public void onChannelError(String errorMessage){
 
     }
-
 }
 

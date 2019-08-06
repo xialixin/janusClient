@@ -13,6 +13,8 @@ package org.appspot.apprtc;
 import android.content.Context;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
+import android.preference.PreferenceManager;
+import android.support.annotation.Nullable;
 import android.util.Log;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +30,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,8 +38,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
-
+//import org.appspot.apprtc.AppRTCClient.SignalingParameters;
+import org.appspot.apprtc.RecordedAudioToFileController;
+import org.appspot.apprtc.janus.JanusConnection;
 import org.appspot.apprtc.janus.JanusConnection2;
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -50,8 +54,10 @@ import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.MediaStreamTrack;
+import org.webrtc.MediaStreamTrack.MediaType;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnection.IceConnectionState;
+import org.webrtc.PeerConnection.PeerConnectionState;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RtpParameters;
 import org.webrtc.RtpReceiver;
@@ -64,11 +70,9 @@ import org.webrtc.SoftwareVideoEncoderFactory;
 import org.webrtc.StatsObserver;
 import org.webrtc.StatsReport;
 import org.webrtc.SurfaceTextureHelper;
-import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoDecoderFactory;
 import org.webrtc.VideoEncoderFactory;
-import org.webrtc.VideoFrame;
 import org.webrtc.VideoSink;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
@@ -76,21 +80,16 @@ import org.webrtc.audio.AudioDeviceModule;
 import org.webrtc.audio.JavaAudioDeviceModule;
 import org.webrtc.audio.JavaAudioDeviceModule.AudioRecordErrorCallback;
 import org.webrtc.audio.JavaAudioDeviceModule.AudioTrackErrorCallback;
-import org.webrtc.audio.LegacyAudioDeviceModule;
-import org.webrtc.voiceengine.WebRtcAudioManager;
-import org.webrtc.voiceengine.WebRtcAudioRecord;
-import org.webrtc.voiceengine.WebRtcAudioRecord.AudioRecordStartErrorCode;
-import org.webrtc.voiceengine.WebRtcAudioRecord.WebRtcAudioRecordErrorCallback;
-import org.webrtc.voiceengine.WebRtcAudioTrack;
-import org.webrtc.voiceengine.WebRtcAudioTrack.AudioTrackStartErrorCode;
-import org.webrtc.voiceengine.WebRtcAudioUtils;
+
+import org.webrtc.SurfaceViewRenderer;
+import org.webrtc.VideoFrame;
 
 /**
  * Peer connection client implementation.
  *
  * <p>All public methods are routed to local looper thread.
  * All PeerConnectionEvents callbacks are invoked from the same looper thread.
- * This class is a singleton.CreateOffer
+ * This class is a singleton.
  */
 public class PeerConnectionClient2 {
   public static final String VIDEO_TRACK_ID = "ARDAMSv0";
@@ -126,8 +125,8 @@ public class PeerConnectionClient2 {
   // created on the same thread as previously destroyed factory.
   private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  //private final PCObserver pcObserver = new PCObserver();
-  //private final SDPObserver sdpObserver = new SDPObserver();
+  private final PCObserver pcObserver = new PCObserver();
+  private final SDPObserver sdpObserver = new SDPObserver();
   private final Timer statsTimer = new Timer();
   private final EglBase rootEglBase;
   private final Context appContext;
@@ -136,6 +135,8 @@ public class PeerConnectionClient2 {
 
   @Nullable
   private PeerConnectionFactory factory;
+  //@Nullable
+  //private PeerConnection peerConnection;
   @Nullable
   private ConcurrentHashMap<BigInteger,JanusConnection2> peerConnectionMap;
   @Nullable
@@ -150,6 +151,7 @@ public class PeerConnectionClient2 {
   @Nullable
   private VideoSink localSink;
   @Nullable private List<VideoSink> remoteSinks;
+  //private SignalingParameters signalingParameters;
   private int videoWidth;
   private int videoHeight;
   private int videoFps;
@@ -185,8 +187,7 @@ public class PeerConnectionClient2 {
   private RtcEventLog rtcEventLog;
   // Implements the WebRtcAudioRecordSamplesReadyCallback interface and writes
   // recorded audio samples to an output file.
-  @Nullable
-  private RecordedAudioToFileController saveRecordedAudioToFile = null;
+  @Nullable private RecordedAudioToFileController saveRecordedAudioToFile;
 
   /**
    * Peer connection parameters.
@@ -235,7 +236,6 @@ public class PeerConnectionClient2 {
     public final boolean disableBuiltInNS;
     public final boolean disableWebRtcAGCAndHPF;
     public final boolean enableRtcEventLog;
-    public final boolean useLegacyAudioDevice;
     private final DataChannelParameters dataChannelParameters;
 
     public PeerConnectionParameters(boolean videoCallEnabled, boolean loopback, boolean tracing,
@@ -244,7 +244,7 @@ public class PeerConnectionClient2 {
         String audioCodec, boolean noAudioProcessing, boolean aecDump, boolean saveInputAudioToFile,
         boolean useOpenSLES, boolean disableBuiltInAEC, boolean disableBuiltInAGC,
         boolean disableBuiltInNS, boolean disableWebRtcAGCAndHPF, boolean enableRtcEventLog,
-        boolean useLegacyAudioDevice, DataChannelParameters dataChannelParameters) {
+        DataChannelParameters dataChannelParameters) {
       this.videoCallEnabled = videoCallEnabled;
       this.loopback = loopback;
       this.tracing = tracing;
@@ -266,7 +266,6 @@ public class PeerConnectionClient2 {
       this.disableBuiltInNS = disableBuiltInNS;
       this.disableWebRtcAGCAndHPF = disableWebRtcAGCAndHPF;
       this.enableRtcEventLog = enableRtcEventLog;
-      this.useLegacyAudioDevice = useLegacyAudioDevice;
       this.dataChannelParameters = dataChannelParameters;
     }
   }
@@ -278,18 +277,17 @@ public class PeerConnectionClient2 {
     /**
      * Callback fired once local SDP is created and set.
      */
-    void onLocalDescription(final BigInteger handleId, final SessionDescription sdp);
-
+    void onLocalDescription(final SessionDescription sdp, final BigInteger handleId);
 
     /**
      * Callback fired once local Ice candidate is generated.
      */
-    void onIceCandidate(final BigInteger handleId, final IceCandidate candidate);
+    void onIceCandidate(final IceCandidate candidate, final BigInteger handleId);
 
     /**
      * Callback fired once local ICE candidates are removed.
      */
-    void onIceCandidatesRemoved(final BigInteger handleId, final IceCandidate[] candidates);
+    void onIceCandidatesRemoved(final IceCandidate[] candidates, final BigInteger handleId);
 
     /**
      * Callback fired once connection is established (IceConnectionState is
@@ -298,28 +296,39 @@ public class PeerConnectionClient2 {
     void onIceConnected(final BigInteger handleId);
 
     /**
-     * Callback fired once connection is closed (IceConnectionState is
+     * Callback fired once connection is disconnected (IceConnectionState is
      * DISCONNECTED).
      */
     void onIceDisconnected(final BigInteger handleId);
 
     /**
+     * Callback fired once DTLS connection is established (PeerConnectionState
+     * is CONNECTED).
+     */
+    void onConnected();
+
+    /**
+     * Callback fired once DTLS connection is disconnected (PeerConnectionState
+     * is DISCONNECTED).
+     */
+    void onDisconnected();
+
+    /**
      * Callback fired once peer connection is closed.
      */
-    void onPeerConnectionClosed(final BigInteger handleId);
+    void onPeerConnectionClosed();
 
     /**
      * Callback fired once peer connection statistics is ready.
      */
-    void onPeerConnectionStatsReady(final BigInteger handleId, final StatsReport[] reports);
+    void onPeerConnectionStatsReady(final StatsReport[] reports, final BigInteger handleId);
 
     /**
      * Callback fired once peer connection error happened.
      */
-    void onPeerConnectionError(final BigInteger handleId, final String description);
+    void onPeerConnectionError(final String description);
 
     void onLocalRender(final BigInteger handleId);
-
     void onRemoteRender(final BigInteger handleId);
   }
 
@@ -354,8 +363,7 @@ public class PeerConnectionClient2 {
     this.events = events;
     this.peerConnectionParameters = peerConnectionParameters;
     this.dataChannelEnabled = peerConnectionParameters.dataChannelParameters != null;
-
-    this.peerConnectionMap=new ConcurrentHashMap<>();
+	this.peerConnectionMap=new ConcurrentHashMap<>();
     this.videoSinkMap=new ConcurrentHashMap<>();
 
     Log.d(TAG, "Preferred video codec: " + getSdpVideoCodecName(peerConnectionParameters));
@@ -385,11 +393,14 @@ public class PeerConnectionClient2 {
     if (peerConnectionParameters.videoCallEnabled && videoCapturer == null) {
       Log.w(TAG, "Video call enabled but no video capturer provided.");
     }
+
     if (peerConnectionParameters == null) {
       Log.e(TAG, "Creating peer connection without initializing factory.");
       return;
     }
+
     this.videoCapturer = videoCapturer;
+    //this.signalingParameters = signalingParameters;
     executor.execute(() -> {
       try {
         createMediaConstraintsInternal();
@@ -423,9 +434,23 @@ public class PeerConnectionClient2 {
     preferIsac = peerConnectionParameters.audioCodec != null
         && peerConnectionParameters.audioCodec.equals(AUDIO_CODEC_ISAC);
 
-    final AudioDeviceModule adm = peerConnectionParameters.useLegacyAudioDevice
-        ? createLegacyAudioDevice()
-        : createJavaAudioDevice();
+    // It is possible to save a copy in raw PCM format on a file by checking
+    // the "Save input audio to file" checkbox in the Settings UI. A callback
+    // interface is set when this flag is enabled. As a result, a copy of recorded
+    // audio samples are provided to this client directly from the native audio
+    // layer in Java.
+    if (peerConnectionParameters.saveInputAudioToFile) {
+      if (!peerConnectionParameters.useOpenSLES) {
+        Log.d(TAG, "Enable recording of microphone input audio to file");
+        saveRecordedAudioToFile = new RecordedAudioToFileController(executor);
+      } else {
+        // TODO(henrika): ensure that the UI reflects that if OpenSL ES is selected,
+        // then the "Save inut audio to file" option shall be grayed out.
+        Log.e(TAG, "Recording of input audio is not supported for OpenSL ES");
+      }
+    }
+
+    final AudioDeviceModule adm = createJavaAudioDevice();
 
     // Create peer connection factory.
     if (options != null) {
@@ -453,80 +478,6 @@ public class PeerConnectionClient2 {
                   .createPeerConnectionFactory();
     Log.d(TAG, "Peer connection factory created.");
     adm.release();
-  }
-
-  AudioDeviceModule createLegacyAudioDevice() {
-    // Enable/disable OpenSL ES playback.
-    if (!peerConnectionParameters.useOpenSLES) {
-      Log.d(TAG, "Disable OpenSL ES audio even if device supports it");
-      WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true /* enable */);
-    } else {
-      Log.d(TAG, "Allow OpenSL ES audio if device supports it");
-      WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(false);
-    }
-
-    if (peerConnectionParameters.disableBuiltInAEC) {
-      Log.d(TAG, "Disable built-in AEC even if device supports it");
-      WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
-    } else {
-      Log.d(TAG, "Enable built-in AEC if device supports it");
-      WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(false);
-    }
-
-    if (peerConnectionParameters.disableBuiltInNS) {
-      Log.d(TAG, "Disable built-in NS even if device supports it");
-      WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
-    } else {
-      Log.d(TAG, "Enable built-in NS if device supports it");
-      WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(false);
-    }
-
-    WebRtcAudioRecord.setOnAudioSamplesReady(saveRecordedAudioToFile);
-
-    // Set audio record error callbacks.
-    WebRtcAudioRecord.setErrorCallback(new WebRtcAudioRecordErrorCallback() {
-      @Override
-      public void onWebRtcAudioRecordInitError(String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioRecordInitError: " + errorMessage);
-        reportError(errorMessage);
-      }
-
-      @Override
-      public void onWebRtcAudioRecordStartError(
-          AudioRecordStartErrorCode errorCode, String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioRecordStartError: " + errorCode + ". " + errorMessage);
-        reportError(errorMessage);
-      }
-
-      @Override
-      public void onWebRtcAudioRecordError(String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioRecordError: " + errorMessage);
-        reportError(errorMessage);
-      }
-    });
-
-    WebRtcAudioTrack.setErrorCallback(new WebRtcAudioTrack.ErrorCallback() {
-      @Override
-      public void onWebRtcAudioTrackInitError(String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioTrackInitError: " + errorMessage);
-        reportError(errorMessage);
-      }
-
-      @Override
-      public void onWebRtcAudioTrackStartError(
-          AudioTrackStartErrorCode errorCode, String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioTrackStartError: " + errorCode + ". " + errorMessage);
-        reportError(errorMessage);
-      }
-
-      @Override
-      public void onWebRtcAudioTrackError(String errorMessage) {
-        Log.e(TAG, "onWebRtcAudioTrackError: " + errorMessage);
-        reportError(errorMessage);
-      }
-    });
-
-    return new LegacyAudioDeviceModule();
   }
 
   AudioDeviceModule createJavaAudioDevice() {
@@ -641,7 +592,35 @@ public class PeerConnectionClient2 {
 
     Log.d(TAG, "createPeerConnectioning...");
 
-    PeerConnection peerConnection=createPeerConnection(handleId,true);
+    PeerConnection peerConnection=createPeerConnection(handleId, true);
+
+    /*PeerConnection.RTCConfiguration rtcConfig =
+        new PeerConnection.RTCConfiguration(signalingParameters.iceServers);
+    // TCP candidates are only useful when connecting to a server that supports
+    // ICE-TCP.
+    rtcConfig.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED;
+    rtcConfig.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE;
+    rtcConfig.rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE;
+    rtcConfig.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY;
+    // Use ECDSA encryption.
+    rtcConfig.keyType = PeerConnection.KeyType.ECDSA;
+    // Enable DTLS for normal calls and disable for loopback calls.
+    rtcConfig.enableDtlsSrtp = !peerConnectionParameters.loopback;
+    rtcConfig.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN;
+
+    peerConnection = factory.createPeerConnection(rtcConfig, pcObserver);
+
+    if (dataChannelEnabled) {
+      DataChannel.Init init = new DataChannel.Init();
+      init.ordered = peerConnectionParameters.dataChannelParameters.ordered;
+      init.negotiated = peerConnectionParameters.dataChannelParameters.negotiated;
+      init.maxRetransmits = peerConnectionParameters.dataChannelParameters.maxRetransmits;
+      init.maxRetransmitTimeMs = peerConnectionParameters.dataChannelParameters.maxRetransmitTimeMs;
+      init.id = peerConnectionParameters.dataChannelParameters.id;
+      init.protocol = peerConnectionParameters.dataChannelParameters.protocol;
+      dataChannel = peerConnection.createDataChannel("ApprtcDemo data", init);
+    }
+    isInitiator = false;*/
 
     // Set INFO libjingle logging.
     // NOTE: this _must_ happen while |factory| is alive!
@@ -649,11 +628,11 @@ public class PeerConnectionClient2 {
 
     List<String> mediaStreamLabels = Collections.singletonList("ARDAMS");
     if (isVideoCallEnabled()) {
-      peerConnection.addTrack(createVideoTrack(handleId, videoCapturer), mediaStreamLabels);
+      peerConnection.addTrack(createVideoTrack(videoCapturer, handleId), mediaStreamLabels);
       events.onLocalRender(handleId);
       // We can add the renderers right away because we don't need to wait for an
       // answer to get the remote track.
-     /*remoteVideoTrack = getRemoteVideoTrack(handleId);
+      /*remoteVideoTrack = getRemoteVideoTrack();
       remoteVideoTrack.setEnabled(renderVideo);
       for (VideoSink remoteSink : remoteSinks) {
         remoteVideoTrack.addSink(remoteSink);
@@ -712,16 +691,16 @@ public class PeerConnectionClient2 {
     SDPObserver sdpObserver = new SDPObserver();
     PeerConnection peerConnection = factory.createPeerConnection(rtcConfig, pcObserver);
 
-    JanusConnection2 JanusConnection2 = new JanusConnection2();
-    JanusConnection2.handleId = handleId;
-    JanusConnection2.sdpObserver = sdpObserver;
-    JanusConnection2.peerConnection = peerConnection;
-    JanusConnection2.type = type;
+    JanusConnection2 janusConnection = new JanusConnection2();
+    janusConnection.handleId = handleId;
+    janusConnection.sdpObserver = sdpObserver;
+    janusConnection.peerConnection = peerConnection;
+    janusConnection.type = type;
     Log.d(TAG,"We are putting handleId="+handleId);
-    peerConnectionMap.put(handleId, JanusConnection2);
+    peerConnectionMap.put(handleId, janusConnection);
     videoSinkMap.put(handleId, new proxyVideoSinks());
-    pcObserver.setConnection(JanusConnection2);
-    sdpObserver.setConnection(JanusConnection2);
+    pcObserver.setConnection(janusConnection);
+    sdpObserver.setConnection(janusConnection);
     Log.d(TAG, "Peer connection created.");
     return peerConnection;
   }
@@ -734,6 +713,17 @@ public class PeerConnectionClient2 {
         appContext.getDir(RTCEVENTLOG_OUTPUT_DIR_NAME, Context.MODE_PRIVATE), outputFileName);
   }
 
+  /*private void maybeCreateAndStartRtcEventLog() {
+    if (appContext == null || peerConnection == null) {
+      return;
+    }
+    if (!peerConnectionParameters.enableRtcEventLog) {
+      Log.d(TAG, "RtcEventLog is disabled.");
+      return;
+    }
+    rtcEventLog = new RtcEventLog(peerConnection);
+    rtcEventLog.start(createRtcEventLogOutputFile());
+  }*/
 
   private void closeInternal() {
     if (factory != null && peerConnectionParameters.aecDump) {
@@ -741,6 +731,15 @@ public class PeerConnectionClient2 {
     }
     Log.d(TAG, "Closing peer connection.");
     statsTimer.cancel();
+    if (dataChannel != null) {
+      dataChannel.dispose();
+      dataChannel = null;
+    }
+    if (rtcEventLog != null) {
+      // RtcEventLog should stop before the peer connection is disposed.
+      rtcEventLog.stop();
+      rtcEventLog = null;
+    }
 
     if (peerConnectionMap != null) {
       for(JanusConnection2 conn : peerConnectionMap.values()) {
@@ -750,6 +749,7 @@ public class PeerConnectionClient2 {
         }
       }
     }
+
     peerConnectionMap.clear();
 
     if(videoSinkMap != null) {
@@ -760,7 +760,6 @@ public class PeerConnectionClient2 {
       }
     }
     videoSinkMap.clear();
-
 
     Log.d(TAG, "Closing audio source.");
     if (audioSource != null) {
@@ -787,7 +786,11 @@ public class PeerConnectionClient2 {
       surfaceTextureHelper.dispose();
       surfaceTextureHelper = null;
     }
-
+    if (saveRecordedAudioToFile != null) {
+      Log.d(TAG, "Closing audio file for recorded input audio.");
+      saveRecordedAudioToFile.stop();
+      saveRecordedAudioToFile = null;
+    }
     localSink = null;
     remoteSinks = null;
     Log.d(TAG, "Closing peer connection factory.");
@@ -797,7 +800,7 @@ public class PeerConnectionClient2 {
     }
     rootEglBase.release();
     Log.d(TAG, "Closing peer connection done.");
-    //events.onPeerConnectionClosed(); fixme:
+    events.onPeerConnectionClosed();
     PeerConnectionFactory.stopInternalTracingCapture();
     PeerConnectionFactory.shutdownInternalTracer();
   }
@@ -809,13 +812,13 @@ public class PeerConnectionClient2 {
   @SuppressWarnings("deprecation") // TODO(sakal): getStats is deprecated.
   private void getStats(final BigInteger handleId) {
     PeerConnection peerConnection=peerConnectionMap.get(handleId).peerConnection;
-    if (peerConnection == null || isError) {
+	if (peerConnection == null || isError) {
       return;
     }
     boolean success = peerConnection.getStats(new StatsObserver() {
       @Override
       public void onComplete(final StatsReport[] reports) {
-        //events.onPeerConnectionStatsReady(reports); fixme:
+        events.onPeerConnectionStatsReady(reports, handleId);
       }
     }, null);
     if (!success) {
@@ -823,7 +826,7 @@ public class PeerConnectionClient2 {
     }
   }
 
-  public void enableStatsEvents(boolean enable, int periodMs,final BigInteger handleId) {
+  public void enableStatsEvents(boolean enable, int periodMs, final BigInteger handleId) {
     if (enable) {
       try {
         statsTimer.schedule(new TimerTask() {
@@ -868,7 +871,8 @@ public class PeerConnectionClient2 {
       PeerConnection peerConnection=connection.peerConnection;
       if (peerConnection != null && !isError) {
         Log.d(TAG, "PC Create OFFER");
-        peerConnection.createOffer(connection.sdpObserver, sdpMediaConstraints);
+        //isInitiator = true;
+        peerConnection.createOffer(sdpObserver, sdpMediaConstraints);
       }
     });
   }
@@ -886,7 +890,17 @@ public class PeerConnectionClient2 {
     });
   }
 
-  public void addRemoteIceCandidate(final IceCandidate candidate,final BigInteger handleId) {
+  /*public void createAnswer() {
+    executor.execute(() -> {
+      if (peerConnection != null && !isError) {
+        Log.d(TAG, "PC create ANSWER");
+        isInitiator = false;
+        peerConnection.createAnswer(sdpObserver, sdpMediaConstraints);
+      }
+    });
+  }*/
+
+  public void addRemoteIceCandidate(final IceCandidate candidate, final BigInteger handleId) {
     executor.execute(() -> {
       PeerConnection peerConnection = createPeerConnection(handleId, false);
       SDPObserver sdpObserver = peerConnectionMap.get(handleId).sdpObserver;
@@ -900,7 +914,7 @@ public class PeerConnectionClient2 {
     });
   }
 
-  public void removeRemoteIceCandidates(final IceCandidate[] candidates,final BigInteger handleId) {
+  public void removeRemoteIceCandidates(final IceCandidate[] candidates, final BigInteger handleId) {
     executor.execute(() -> {
       PeerConnection peerConnection = peerConnectionMap.get(handleId).peerConnection;
       SDPObserver sdpObserver = peerConnectionMap.get(handleId).sdpObserver;
@@ -914,7 +928,7 @@ public class PeerConnectionClient2 {
     });
   }
 
-  public void setRemoteDescription(BigInteger handleId, final SessionDescription sdp) {
+  public void setRemoteDescription(final BigInteger handleId, final SessionDescription sdp) {
     executor.execute(() -> {
       PeerConnection peerConnection = peerConnectionMap.get(handleId).peerConnection;
       SDPObserver sdpObserver = peerConnectionMap.get(handleId).sdpObserver;
@@ -956,7 +970,6 @@ public class PeerConnectionClient2 {
     });
   }
 
-
   public void stopVideoSource() {
     executor.execute(() -> {
       if (videoCapturer != null && !videoCapturerStopped) {
@@ -980,7 +993,7 @@ public class PeerConnectionClient2 {
     });
   }
 
-  public void setVideoMaxBitrate(@Nullable final Integer maxBitrateKbps,final BigInteger handleId) {
+  public void setVideoMaxBitrate(@Nullable final Integer maxBitrateKbps, final BigInteger handleId) {
     PeerConnection peerConnection = peerConnectionMap.get(handleId).peerConnection;
     SDPObserver sdpObserver = peerConnectionMap.get(handleId).sdpObserver;
     executor.execute(() -> {
@@ -1014,7 +1027,7 @@ public class PeerConnectionClient2 {
     Log.e(TAG, "Peerconnection error: " + errorMessage);
     executor.execute(() -> {
       if (!isError) {
-        //events.onPeerConnectionError(errorMessage); fixme:
+        events.onPeerConnectionError(errorMessage);
         isError = true;
       }
     });
@@ -1029,7 +1042,7 @@ public class PeerConnectionClient2 {
   }
 
   @Nullable
-  private VideoTrack createVideoTrack(BigInteger handleId, VideoCapturer capturer) {
+  private VideoTrack createVideoTrack(VideoCapturer capturer, BigInteger handleId) {
     surfaceTextureHelper =
         SurfaceTextureHelper.create("CaptureThread", rootEglBase.getEglBaseContext());
     videoSource = factory.createVideoSource(capturer.isScreencast());
@@ -1240,7 +1253,7 @@ public class PeerConnectionClient2 {
   }
 
   private void drainCandidates(BigInteger handleId) {
-    PeerConnection peerConnection = peerConnectionMap.get(handleId).peerConnection;
+	PeerConnection peerConnection = peerConnectionMap.get(handleId).peerConnection;
     if (queuedRemoteCandidates != null) {
       Log.d(TAG, "Add " + queuedRemoteCandidates.size() + " remote candidates");
       for (IceCandidate candidate : queuedRemoteCandidates) {
@@ -1294,12 +1307,12 @@ public class PeerConnectionClient2 {
     }
     @Override
     public void onIceCandidate(final IceCandidate candidate) {
-      executor.execute(() -> events.onIceCandidate(connection.handleId, candidate));
+      executor.execute(() -> events.onIceCandidate(candidate, connection.handleId));
     }
 
     @Override
     public void onIceCandidatesRemoved(final IceCandidate[] candidates) {
-      executor.execute(() -> events.onIceCandidatesRemoved(connection.handleId, candidates));
+      executor.execute(() -> events.onIceCandidatesRemoved(candidates, connection.handleId));
     }
 
     @Override
@@ -1314,9 +1327,23 @@ public class PeerConnectionClient2 {
         if (newState == IceConnectionState.CONNECTED) {
           events.onIceConnected(connection.handleId);
         } else if (newState == IceConnectionState.DISCONNECTED) {
-          events.onIceDisconnected(connection.handleId);
+          events.onIceDisconnected(connection.handleId );
         } else if (newState == IceConnectionState.FAILED) {
           reportError("ICE connection failed.");
+        }
+      });
+    }
+
+    @Override
+    public void onConnectionChange(final PeerConnection.PeerConnectionState newState) {
+      executor.execute(() -> {
+        Log.d(TAG, "PeerConnectionState: " + newState);
+        if (newState == PeerConnectionState.CONNECTED) {
+          events.onConnected();
+        } else if (newState == PeerConnectionState.DISCONNECTED) {
+          events.onDisconnected();
+        } else if (newState == PeerConnectionState.FAILED) {
+          reportError("DTLS connection failed.");
         }
       });
     }
@@ -1449,7 +1476,7 @@ public class PeerConnectionClient2 {
           if (peerConnection.getRemoteDescription() == null) {
             // We've just set our local SDP so time to send it.
             Log.d(TAG, "Local SDP set succesfully");
-            events.onLocalDescription(handleId, localSdp);
+            events.onLocalDescription(localSdp, handleId);
           } else {
             // We've just set remote description, so drain remote
             // and send local ICE candidates.
@@ -1463,7 +1490,7 @@ public class PeerConnectionClient2 {
             // We've just set our local SDP so time to send it, drain
             // remote and send local ICE candidates.
             Log.d(TAG, "Local SDP set succesfully");
-            events.onLocalDescription(handleId, localSdp);
+            events.onLocalDescription(localSdp, handleId);
             drainCandidates(handleId);
           } else {
             // We've just set remote SDP - do nothing for now -

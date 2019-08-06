@@ -72,8 +72,8 @@ public class HudFragment extends Fragment {
 
     Bundle args = getArguments();
     if (args != null) {
-      videoCallEnabled = args.getBoolean(CallActivity.EXTRA_VIDEO_CALL, true);
-      displayHud = args.getBoolean(CallActivity.EXTRA_DISPLAY_HUD, false);
+      videoCallEnabled = args.getBoolean(VideoRoomActivity.EXTRA_VIDEO_CALL, true);
+      displayHud = args.getBoolean(VideoRoomActivity.EXTRA_DISPLAY_HUD, false);
     }
     int visibility = displayHud ? View.VISIBLE : View.INVISIBLE;
     encoderStatView.setVisibility(visibility);

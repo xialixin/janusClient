@@ -16,6 +16,7 @@ import android.util.Log;
 import de.tavendo.autobahn.WebSocket.WebSocketConnectionObserver;
 import de.tavendo.autobahn.WebSocketConnection;
 import de.tavendo.autobahn.WebSocketException;
+import de.tavendo.autobahn.WebSocketOptions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ import org.json.JSONObject;
  * All events are dispatched on the same thread.
  */
 public class WebSocketChannelClient {
-  private static final String TAG = "WSChannelRTCClient";
+  private static final String TAG = "WebSocketChannelClient";
   private static final int CLOSE_TIMEOUT = 1000;
   private final WebSocketChannelEvents events;
   private final Handler handler;
@@ -65,6 +66,7 @@ public class WebSocketChannelClient {
    */
   public interface WebSocketChannelEvents {
     void onWebSocketMessage(final String message);
+	void onWebSocketOpen();
     void onWebSocketClose();
     void onWebSocketError(final String description);
   }
@@ -244,10 +246,9 @@ public class WebSocketChannelClient {
       handler.post(new Runnable() {
         @Override
         public void run() {
-          state = WebSocketConnectionState.CONNECTED;
-          // Check if we have pending register request.
-          if (roomID != null && clientID != null) {
-            register(roomID, clientID);
+          if (state != WebSocketConnectionState.CONNECTED) {
+            state = WebSocketConnectionState.CONNECTED;
+            events.onWebSocketOpen();
           }
         }
       });
