@@ -1,2 +1,5 @@
 # janusClient
-janus_gateway_android rebuild by the lasted android studio tools,base on "https://github.com/pcgpcgpcg/janus-gateway-android"
+
+m75 code copy at 20190427
+
+
