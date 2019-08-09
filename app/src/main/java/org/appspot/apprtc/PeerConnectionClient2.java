@@ -176,7 +176,7 @@ public class PeerConnectionClient2 {
   @Nullable
   private RtpSender localVideoSender;
   // enableAudio is set to true if audio should be sent.
-  private boolean enableAudio = true;
+  private boolean enableAudio = false;
   @Nullable
   private AudioTrack localAudioTrack;
   @Nullable
