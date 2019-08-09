@@ -135,7 +135,10 @@ public class ConnectActivity extends Activity {
       String room = sharedPref.getString(keyprefRoom, "");
       //FIXME
       //connectToRoom(room, true, loopback, useValuesFromIntent, runTimeMs);
+      connectToRoom(TopRTCDemoEnum.VIDEOMEETING,"1234", false, false, false, 0);
     }
+
+      connectToRoom(TopRTCDemoEnum.VIDEOMEETING,"1234", false, false, false, 0);
   }
 
   @Override

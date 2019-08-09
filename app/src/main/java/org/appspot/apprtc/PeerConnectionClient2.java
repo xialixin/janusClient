@@ -125,8 +125,8 @@ public class PeerConnectionClient2 {
   // created on the same thread as previously destroyed factory.
   private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  private final PCObserver pcObserver = new PCObserver();
-  private final SDPObserver sdpObserver = new SDPObserver();
+  //private final PCObserver pcObserver = new PCObserver();
+  //private final SDPObserver sdpObserver = new SDPObserver();
   private final Timer statsTimer = new Timer();
   private final EglBase rootEglBase;
   private final Context appContext;
@@ -632,7 +632,7 @@ public class PeerConnectionClient2 {
       events.onLocalRender(handleId);
       // We can add the renderers right away because we don't need to wait for an
       // answer to get the remote track.
-      /*remoteVideoTrack = getRemoteVideoTrack();
+      /*remoteVideoTrack = getRemoteVideoTrack(handleId);
       remoteVideoTrack.setEnabled(renderVideo);
       for (VideoSink remoteSink : remoteSinks) {
         remoteVideoTrack.addSink(remoteSink);
@@ -872,7 +872,7 @@ public class PeerConnectionClient2 {
       if (peerConnection != null && !isError) {
         Log.d(TAG, "PC Create OFFER");
         //isInitiator = true;
-        peerConnection.createOffer(sdpObserver, sdpMediaConstraints);
+        peerConnection.createOffer(connection.sdpObserver, sdpMediaConstraints);
       }
     });
   }
