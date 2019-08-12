@@ -283,7 +283,7 @@ public class VideoRoomActivity extends Activity implements PeerConnectionClient2
         }
 
         // Get Intent parameters.
-        roomUrl=intent.getDataString();
+        //roomUrl=intent.getDataString();
         //roomId = intent.getLongExtra(EXTRA_ROOMID, 0);
         roomId=1234;
         Log.d(TAG, "Room ID: " + roomId);
