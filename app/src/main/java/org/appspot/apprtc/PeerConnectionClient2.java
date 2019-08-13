@@ -115,8 +115,8 @@ public class PeerConnectionClient2 {
   private static final String AUDIO_HIGH_PASS_FILTER_CONSTRAINT = "googHighpassFilter";
   private static final String AUDIO_NOISE_SUPPRESSION_CONSTRAINT = "googNoiseSuppression";
   private static final String DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT = "DtlsSrtpKeyAgreement";
-  private static final int HD_VIDEO_WIDTH = 1280;
-  private static final int HD_VIDEO_HEIGHT = 720;
+  private static final int HD_VIDEO_WIDTH = 352;
+  private static final int HD_VIDEO_HEIGHT = 288;
   private static final int BPS_IN_KBPS = 1000;
   private static final String RTCEVENTLOG_OUTPUT_DIR_NAME = "rtc_event_log";
 
