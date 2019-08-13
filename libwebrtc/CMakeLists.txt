@@ -132,13 +132,13 @@ file(GLOB_RECURSE src_modules
     ${WEBRTC_REPO}/modules/*.cc
     ${WEBRTC_REPO}/${WEBRTC_BUILD_DIR}/gen/modules/*.cc
 )
-message("@@@org is "${src_modules})
+##message("@@@org is "${src_modules})
 list(FILTER src_modules EXCLUDE REGEX ${TEST_CC_FILTER})
 list(FILTER src_modules EXCLUDE REGEX ${OTHER_PLATFORM_CC_FILTER})
 list(FILTER src_modules EXCLUDE REGEX 
     ".*/desktop_capture/.|.*/linux/.*|.*include/audio_device_factory.cc|.*bwe_simulations.cc|.*/audio_coding/neteq/tools/.*|.*/remote_bitrate_estimator/tools/.*|.*rnn_vad_tool.cc|.*null_aec_dump_factory.cc|.*vp9_noop.cc|.*/android/aaudio_.*|.*ensure_initialized.cc|.*fixed_gain_controller.cc|.*click_annotate.cc"
 )
-message("@@@last is "${src_modules})
+##message("@@@last is "${src_modules})
 
 
 ##file(GLOB_RECURSE src_ortc
